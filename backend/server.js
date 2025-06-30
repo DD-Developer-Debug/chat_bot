@@ -27,9 +27,6 @@ const io = new Server(server, {
   }
 });
 
-// Load plugin system
-const pluginLoader = require('./lib/pluginLoader.js');
-
 // Middleware
 app.use(cors({
   origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
@@ -70,7 +67,6 @@ const JWT_SECRET = 'your-secret-key-change-in-production';
 
 // Admin credentials
 const ADMIN_USERNAME = 'DarkWinzo';
-const ADMIN_EMAIL = 'DarkWinzo@gmail.com';
 const ADMIN_PASSWORD = '20030210';
 
 // Advanced WhatsApp Bot class
@@ -80,7 +76,6 @@ class AdvancedWhatsAppBot {
     this.io = io;
     this.client = null;
     this.isConnected = false;
-    this.isPaused = false;
     this.startTime = Date.now();
     this.messageCount = 0;
     this.userCount = 0;
@@ -97,120 +92,64 @@ class AdvancedWhatsAppBot {
     this.currentChat = null;
     this.messages = new Map(); // Store messages for each chat
     
-    // Load config
-    this.config = this.loadConfig();
-    this.settings = this.loadSettings();
-  }
-
-  loadConfig() {
-    try {
-      const configPath = path.join(__dirname, 'config/config.json');
-      if (fs.existsSync(configPath)) {
-        return JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      }
-    } catch (error) {
-      console.error('Error loading config:', error);
-    }
-    
-    // Default config
-    return {
-      LANGUAGE: "EN",
-      PREFIX: ".",
-      OWNER_NUMBER: "",
-      BOT_NAME: "Queen Bot",
-      AUTO_REACT: true,
-      AUTO_READ: false,
-      WELCOME_MESSAGE: true,
-      ANTI_LINK: false,
-      MAX_DOWNLOAD_SIZE: "100MB",
-      WORK_MODE: "public",
-      RESPONSE_DELAY: 1000,
-      MAX_MESSAGES_PER_MINUTE: 10,
-      AI_CHATBOT: false,
-      VOICE_TO_TEXT: false,
-      TEXT_TO_VOICE: false,
-      IMAGE_GENERATION: false,
-      WEATHER_UPDATES: false,
-      NEWS_UPDATES: false,
-      REMINDER_SYSTEM: false,
-      GROUP_MANAGEMENT: true,
-      ADMIN_ONLY: false,
-      GROUP_ADMIN_ONLY: false,
-      BLOCK_UNKNOWN: false,
-      ANTI_FLOOD: true,
-      ALLOWED_FILE_TYPES: ["image", "video", "audio", "document"],
-      AUTO_DOWNLOAD_MEDIA: false,
-      COMPRESS_IMAGES: true,
-      LOG_MESSAGES: true,
-      SAVE_MEDIA: true,
-      NOTIFY_ON_COMMAND: true,
-      NOTIFY_ON_ERROR: true,
-      NOTIFY_ON_NEW_USER: false,
-      NOTIFY_ON_GROUP_JOIN: true,
-      AUTO_REPLY_TEXT: "Hello! I am currently unavailable. I will get back to you soon.",
-      AUTO_REPLY_ENABLED: false,
-      WELCOME_TEXT: "Welcome to our group! Please read the rules and enjoy your stay."
-    };
-  }
-
-  loadSettings() {
-    return {
+    this.settings = {
       // Basic Settings
-      botName: this.config.BOT_NAME,
-      prefix: this.config.PREFIX,
-      language: this.config.LANGUAGE,
-      ownerNumber: this.config.OWNER_NUMBER,
+      botName: 'Queen Bot',
+      prefix: '.',
+      language: 'EN',
+      ownerNumber: '',
       
       // Behavior Settings
-      autoReact: this.config.AUTO_REACT,
-      autoRead: this.config.AUTO_READ,
+      autoReact: true,
+      autoRead: false,
       autoTyping: true,
-      welcomeMessage: this.config.WELCOME_MESSAGE,
-      antiLink: this.config.ANTI_LINK,
+      welcomeMessage: true,
+      antiLink: false,
       antiSpam: true,
-      autoReply: this.config.AUTO_REPLY_ENABLED,
+      autoReply: false,
       
       // Advanced Features
-      aiChatbot: this.config.AI_CHATBOT,
-      voiceToText: this.config.VOICE_TO_TEXT,
-      textToVoice: this.config.TEXT_TO_VOICE,
-      imageGeneration: this.config.IMAGE_GENERATION,
-      weatherUpdates: this.config.WEATHER_UPDATES,
-      newsUpdates: this.config.NEWS_UPDATES,
-      reminderSystem: this.config.REMINDER_SYSTEM,
-      groupManagement: this.config.GROUP_MANAGEMENT,
+      aiChatbot: false,
+      voiceToText: false,
+      textToVoice: false,
+      imageGeneration: false,
+      weatherUpdates: false,
+      newsUpdates: false,
+      reminderSystem: false,
+      groupManagement: true,
       
       // Security Settings
-      adminOnly: this.config.ADMIN_ONLY,
-      groupAdminOnly: this.config.GROUP_ADMIN_ONLY,
-      blockUnknown: this.config.BLOCK_UNKNOWN,
-      antiFlood: this.config.ANTI_FLOOD,
-      maxMessagesPerMinute: this.config.MAX_MESSAGES_PER_MINUTE,
+      adminOnly: false,
+      groupAdminOnly: false,
+      blockUnknown: false,
+      antiFlood: true,
+      maxMessagesPerMinute: 10,
       
       // Media Settings
-      maxDownloadSize: this.config.MAX_DOWNLOAD_SIZE,
-      allowedFileTypes: this.config.ALLOWED_FILE_TYPES,
-      autoDownloadMedia: this.config.AUTO_DOWNLOAD_MEDIA,
-      compressImages: this.config.COMPRESS_IMAGES,
+      maxDownloadSize: '100MB',
+      allowedFileTypes: ['image', 'video', 'audio', 'document'],
+      autoDownloadMedia: false,
+      compressImages: true,
       
       // Response Settings
-      responseDelay: this.config.RESPONSE_DELAY,
-      workMode: this.config.WORK_MODE,
-      logMessages: this.config.LOG_MESSAGES,
-      saveMedia: this.config.SAVE_MEDIA,
+      responseDelay: 1000,
+      workMode: 'public', // public, private, group-only
+      logMessages: true,
+      saveMedia: true,
       
       // Notification Settings
-      notifyOnCommand: this.config.NOTIFY_ON_COMMAND,
-      notifyOnError: this.config.NOTIFY_ON_ERROR,
-      notifyOnNewUser: this.config.NOTIFY_ON_NEW_USER,
-      notifyOnGroupJoin: this.config.NOTIFY_ON_GROUP_JOIN,
+      notifyOnCommand: true,
+      notifyOnError: true,
+      notifyOnNewUser: false,
+      notifyOnGroupJoin: true,
       
       // Auto-Reply Settings
-      autoReplyText: this.config.AUTO_REPLY_TEXT,
-      autoReplyEnabled: this.config.AUTO_REPLY_ENABLED,
+      autoReplyText: 'Hello! I am currently unavailable. I will get back to you soon.',
+      autoReplyEnabled: false,
       
       // Welcome Message Settings
-      welcomeText: this.config.WELCOME_TEXT,
+      welcomeText: 'Welcome to our group! Please read the rules and enjoy your stay.',
+      welcomeMedia: null,
       
       // Command Settings
       enabledCommands: {
@@ -232,21 +171,255 @@ class AdvancedWhatsAppBot {
         mute: true,
         unmute: true,
         everyone: true,
-        tagall: true,
-        joke: true,
-        quote: true,
-        fact: true,
-        meme: true
+        tagall: true
       }
     };
+
+    this.commands = new Map();
+    this.initializeCommands();
+  }
+
+  initializeCommands() {
+    // Basic Commands
+    this.commands.set('ping', {
+      description: 'Check bot response time',
+      usage: '.ping',
+      category: 'utility',
+      adminOnly: false,
+      execute: async (message) => {
+        const start = Date.now();
+        const reply = await message.reply('🏓 Pong!');
+        const end = Date.now();
+        const responseTime = end - start;
+        await message.reply(`🏓 Pong!\n⚡ Response time: ${responseTime}ms\n🤖 Status: Online\n✨ Bot Speed: ${responseTime < 100 ? 'Excellent' : responseTime < 500 ? 'Good' : 'Average'}`);
+      }
+    });
+
+    this.commands.set('help', {
+      description: 'Show available commands',
+      usage: '.help [command]',
+      category: 'utility',
+      adminOnly: false,
+      execute: async (message, args) => {
+        if (args.length > 0) {
+          const cmd = this.commands.get(args[0]);
+          if (cmd) {
+            await message.reply(`📖 *${args[0]}*\n\n📝 Description: ${cmd.description}\n💡 Usage: ${cmd.usage}\n📂 Category: ${cmd.category}\n👑 Admin Only: ${cmd.adminOnly ? 'Yes' : 'No'}`);
+          } else {
+            await message.reply('❌ Command not found!');
+          }
+        } else {
+          const categories = {};
+          this.commands.forEach((cmd, name) => {
+            if (!categories[cmd.category]) categories[cmd.category] = [];
+            categories[cmd.category].push(name);
+          });
+
+          let helpText = '📋 *Available Commands*\n\n';
+          Object.keys(categories).forEach(category => {
+            helpText += `📂 *${category.toUpperCase()}*\n`;
+            categories[category].forEach(cmd => {
+              helpText += `• ${this.settings.prefix}${cmd}\n`;
+            });
+            helpText += '\n';
+          });
+          helpText += `💡 Use ${this.settings.prefix}help <command> for detailed info`;
+          
+          await message.reply(helpText);
+        }
+      }
+    });
+
+    this.commands.set('info', {
+      description: 'Show bot information',
+      usage: '.info',
+      category: 'utility',
+      adminOnly: false,
+      execute: async (message) => {
+        const uptime = moment.duration(Date.now() - this.startTime).humanize();
+        const info = `🤖 *${this.settings.botName}*\n\n` +
+                    `⏰ Uptime: ${uptime}\n` +
+                    `👥 Users: ${this.userCount}\n` +
+                    `👥 Groups: ${this.groupCount}\n` +
+                    `💬 Messages: ${this.messageCount}\n` +
+                    `🔧 Commands: ${this.commands.size}\n` +
+                    `🌐 Language: ${this.settings.language}\n` +
+                    `⚡ Status: Online`;
+        await message.reply(info);
+      }
+    });
+
+    this.commands.set('weather', {
+      description: 'Get weather information',
+      usage: '.weather <city>',
+      category: 'utility',
+      adminOnly: false,
+      execute: async (message, args) => {
+        if (args.length === 0) {
+          await message.reply('❌ Please provide a city name!\nUsage: .weather <city>');
+          return;
+        }
+        
+        try {
+          const city = args.join(' ');
+          // Mock weather data (replace with real API)
+          const weather = {
+            location: city,
+            temperature: Math.floor(Math.random() * 30) + 15,
+            condition: ['Sunny', 'Cloudy', 'Rainy', 'Stormy'][Math.floor(Math.random() * 4)],
+            humidity: Math.floor(Math.random() * 50) + 30
+          };
+          
+          const weatherText = `🌤️ *Weather in ${weather.location}*\n\n` +
+                             `🌡️ Temperature: ${weather.temperature}°C\n` +
+                             `☁️ Condition: ${weather.condition}\n` +
+                             `💧 Humidity: ${weather.humidity}%`;
+          
+          await message.reply(weatherText);
+        } catch (error) {
+          await message.reply('❌ Failed to get weather information!');
+        }
+      }
+    });
+
+    this.commands.set('sticker', {
+      description: 'Convert image/video to sticker',
+      usage: '.sticker (reply to image/video)',
+      category: 'media',
+      adminOnly: false,
+      execute: async (message) => {
+        if (!message.hasQuotedMsg) {
+          await message.reply('❌ Please reply to an image or video!');
+          return;
+        }
+
+        try {
+          const quotedMsg = await message.getQuotedMessage();
+          if (quotedMsg.hasMedia) {
+            const media = await quotedMsg.downloadMedia();
+            const sticker = new MessageMedia('image/webp', media.data, 'sticker.webp');
+            await message.reply(sticker, undefined, { sendMediaAsSticker: true });
+          } else {
+            await message.reply('❌ Please reply to an image or video!');
+          }
+        } catch (error) {
+          await message.reply('❌ Failed to create sticker!');
+        }
+      }
+    });
+
+    // Group Management Commands
+    this.commands.set('kick', {
+      description: 'Kick user from group',
+      usage: '.kick @user',
+      category: 'admin',
+      adminOnly: true,
+      execute: async (message, args) => {
+        const chat = await message.getChat();
+        if (!chat.isGroup) {
+          await message.reply('❌ This command only works in groups!');
+          return;
+        }
+
+        const mentions = await message.getMentions();
+        if (mentions.length === 0) {
+          await message.reply('❌ Please mention a user to kick!');
+          return;
+        }
+
+        try {
+          await chat.removeParticipants(mentions.map(m => m.id._serialized));
+          await message.reply('✅ User(s) kicked successfully!');
+        } catch (error) {
+          await message.reply('❌ Failed to kick user(s)!');
+        }
+      }
+    });
+
+    this.commands.set('ban', {
+      description: 'Ban user from using bot',
+      usage: '.ban @user',
+      category: 'admin',
+      adminOnly: true,
+      execute: async (message) => {
+        const mentions = await message.getMentions();
+        if (mentions.length === 0) {
+          await message.reply('❌ Please mention a user to ban!');
+          return;
+        }
+
+        mentions.forEach(user => {
+          this.bannedUsers.add(user.id._serialized);
+        });
+
+        await message.reply('✅ User(s) banned successfully!');
+      }
+    });
+
+    this.commands.set('everyone', {
+      description: 'Tag all group members',
+      usage: '.everyone <message>',
+      category: 'group',
+      adminOnly: true,
+      execute: async (message, args) => {
+        const chat = await message.getChat();
+        if (!chat.isGroup) {
+          await message.reply('❌ This command only works in groups!');
+          return;
+        }
+
+        const text = args.join(' ') || 'Attention everyone!';
+        let mentions = [];
+        
+        for (let participant of chat.participants) {
+          mentions.push(`@${participant.id.user}`);
+        }
+
+        await message.reply(`${text}\n\n${mentions.join(' ')}`);
+      }
+    });
+
+    // Fun Commands
+    this.commands.set('joke', {
+      description: 'Get a random joke',
+      usage: '.joke',
+      category: 'fun',
+      adminOnly: false,
+      execute: async (message) => {
+        const jokes = [
+          "Why don't scientists trust atoms? Because they make up everything!",
+          "Why did the scarecrow win an award? He was outstanding in his field!",
+          "Why don't eggs tell jokes? They'd crack each other up!",
+          "What do you call a fake noodle? An impasta!",
+          "Why did the math book look so sad? Because it had too many problems!"
+        ];
+        const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+        await message.reply(`😂 *Random Joke*\n\n${randomJoke}`);
+      }
+    });
+
+    this.commands.set('quote', {
+      description: 'Get an inspirational quote',
+      usage: '.quote',
+      category: 'fun',
+      adminOnly: false,
+      execute: async (message) => {
+        const quotes = [
+          "The only way to do great work is to love what you do. - Steve Jobs",
+          "Innovation distinguishes between a leader and a follower. - Steve Jobs",
+          "Life is what happens to you while you're busy making other plans. - John Lennon",
+          "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+          "It is during our darkest moments that we must focus to see the light. - Aristotle"
+        ];
+        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+        await message.reply(`✨ *Inspirational Quote*\n\n${randomQuote}`);
+      }
+    });
   }
 
   async initialize() {
     try {
       console.log(`Initializing bot for user ${this.userId}...`);
-      
-      // Load plugins
-      await pluginLoader.loadPlugins();
       
       this.client = new Client({
         authStrategy: new LocalAuth({
@@ -332,7 +505,7 @@ class AdvancedWhatsAppBot {
                 timestamp: chat.lastMessage.timestamp,
                 fromMe: chat.lastMessage.fromMe
               } : null,
-              profilePicUrl: null
+              profilePicUrl: null // Will be loaded separately if needed
             };
           } catch (error) {
             console.error('Error processing chat:', error);
@@ -378,9 +551,7 @@ class AdvancedWhatsAppBot {
     });
 
     this.client.on('message', async (message) => {
-      if (!this.isPaused) {
-        await this.handleMessage(message);
-      }
+      await this.handleMessage(message);
     });
 
     this.client.on('message_create', async (message) => {
@@ -485,9 +656,14 @@ class AdvancedWhatsAppBot {
       if (message.body.startsWith(this.settings.prefix)) {
         await this.handleCommand(message);
       }
-      // Handle non-prefix commands (like greetings)
-      else {
-        await this.handleNonPrefixCommand(message);
+      
+      // Auto-reply
+      else if (this.settings.autoReply && this.settings.autoReplyEnabled) {
+        const chat = await message.getChat();
+        if (!chat.isGroup) { // Only in private chats
+          await this.sendTyping(message);
+          await message.reply(this.settings.autoReplyText);
+        }
       }
 
       // Log message if enabled
@@ -504,10 +680,7 @@ class AdvancedWhatsAppBot {
     const args = message.body.slice(this.settings.prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
     
-    // Get commands from plugin loader
-    const commands = pluginLoader.getCommands();
-    const command = commands.find(cmd => cmd.pattern && cmd.pattern.includes(commandName));
-    
+    const command = this.commands.get(commandName);
     if (!command) return;
 
     // Check if command is enabled
@@ -517,7 +690,7 @@ class AdvancedWhatsAppBot {
     }
 
     // Check admin permissions
-    if (command.adminOnly || command.ownerOnly) {
+    if (command.adminOnly) {
       const contact = await message.getContact();
       if (contact.number !== this.settings.ownerNumber.replace(/\D/g, '')) {
         await message.reply('❌ This command requires admin privileges!');
@@ -536,16 +709,6 @@ class AdvancedWhatsAppBot {
       return;
     }
 
-    // Check group/PM restrictions
-    if (command.onlyGroup && !chat.isGroup) {
-      await message.reply('❌ This command only works in groups!');
-      return;
-    }
-    if (command.onlyPm && chat.isGroup) {
-      await message.reply('❌ This command only works in private messages!');
-      return;
-    }
-
     try {
       // Send typing indicator
       if (this.settings.autoTyping) {
@@ -557,17 +720,8 @@ class AdvancedWhatsAppBot {
         await new Promise(resolve => setTimeout(resolve, this.settings.responseDelay));
       }
 
-      // React to command if specified
-      if (command.React) {
-        try {
-          await message.react(command.React);
-        } catch (error) {
-          // Ignore reaction errors
-        }
-      }
-
       // Execute command
-      await command.function(message, this.client, args);
+      await command.execute(message, args);
       
       // Track command usage
       const count = this.commandsUsed.get(commandName) || 0;
@@ -584,46 +738,6 @@ class AdvancedWhatsAppBot {
       
       if (this.settings.notifyOnError) {
         console.error(`Command error: ${commandName} - ${error.message}`);
-      }
-    }
-  }
-
-  async handleNonPrefixCommand(message) {
-    // Get commands from plugin loader
-    const commands = pluginLoader.getCommands();
-    const messageText = message.body.toLowerCase().trim();
-    
-    // Find non-prefix commands (like greetings)
-    const nonPrefixCommand = commands.find(cmd => 
-      cmd.fromMe === false && 
-      cmd.pattern && 
-      cmd.pattern.some(pattern => messageText.includes(pattern.toLowerCase()))
-    );
-    
-    if (nonPrefixCommand) {
-      try {
-        // React to command if specified
-        if (nonPrefixCommand.React) {
-          try {
-            await message.react(nonPrefixCommand.React);
-          } catch (error) {
-            // Ignore reaction errors
-          }
-        }
-
-        // Execute command
-        await nonPrefixCommand.function(message, this.client, []);
-        
-      } catch (error) {
-        console.error('Error executing non-prefix command:', error);
-      }
-    }
-    // Auto-reply for non-command messages
-    else if (this.settings.autoReply && this.settings.autoReplyEnabled) {
-      const chat = await message.getChat();
-      if (!chat.isGroup) { // Only in private chats
-        await this.sendTyping(message);
-        await message.reply(this.settings.autoReplyText);
       }
     }
   }
@@ -672,7 +786,7 @@ class AdvancedWhatsAppBot {
       const timeout = setTimeout(() => {
         console.error(`QR code generation timeout for user ${this.userId}`);
         reject(new Error('QR code generation timeout. Please try again.'));
-      }, 60000);
+      }, 60000); // Increased timeout to 60 seconds
 
       const onQR = (qr) => {
         clearTimeout(timeout);
@@ -692,7 +806,7 @@ class AdvancedWhatsAppBot {
         clearTimeout(timeout);
         this.client.removeListener('qr', onQR);
         console.log(`Bot ${this.userId} already authenticated`);
-        resolve(null);
+        resolve(null); // Already authenticated
       };
 
       const onAuthFailure = (message) => {
@@ -711,6 +825,8 @@ class AdvancedWhatsAppBot {
 
   async generatePairingCode(phoneNumber) {
     try {
+      // whatsapp-web.js doesn't support pairing codes directly
+      // This is a placeholder for future implementation
       throw new Error('Pairing code method not supported with whatsapp-web.js. Please use QR code method.');
     } catch (error) {
       throw error;
@@ -734,24 +850,6 @@ class AdvancedWhatsAppBot {
     }
   }
 
-  pause() {
-    this.isPaused = true;
-    console.log(`Bot ${this.userId} paused`);
-  }
-
-  resume() {
-    this.isPaused = false;
-    console.log(`Bot ${this.userId} resumed`);
-  }
-
-  async restart() {
-    console.log(`Restarting bot ${this.userId}...`);
-    await this.disconnect();
-    setTimeout(async () => {
-      await this.initialize();
-    }, 2000);
-  }
-
   async getStats() {
     const uptime = Math.floor((Date.now() - this.startTime) / 1000);
     const commandStats = Object.fromEntries(this.commandsUsed);
@@ -766,8 +864,7 @@ class AdvancedWhatsAppBot {
       bannedUsers: this.bannedUsers.size,
       commandStats,
       ramUsage: Math.floor(Math.random() * 30) + 40,
-      cpuUsage: Math.floor(Math.random() * 20) + 10,
-      isPaused: this.isPaused
+      cpuUsage: Math.floor(Math.random() * 20) + 10
     };
   }
 
@@ -778,19 +875,11 @@ class AdvancedWhatsAppBot {
   async updateSettings(newSettings) {
     this.settings = { ...this.settings, ...newSettings };
     
-    // Update config
-    this.config = { ...this.config, ...newSettings };
-    
     // Save settings to file
     try {
       const settingsPath = path.join(__dirname, 'data', `${this.userId}_settings.json`);
       await fs.ensureDir(path.dirname(settingsPath));
       await fs.writeJson(settingsPath, this.settings, { spaces: 2 });
-      
-      // Save config
-      const configPath = path.join(__dirname, 'config/config.json');
-      await fs.ensureDir(path.dirname(configPath));
-      await fs.writeJson(configPath, this.config, { spaces: 2 });
     } catch (error) {
       console.error('Error saving settings:', error);
     }
@@ -817,6 +906,49 @@ class AdvancedWhatsAppBot {
       throw error;
     }
   }
+
+  // Advanced Features
+  async scheduleMessage(chatId, message, time) {
+    this.scheduledMessages.push({
+      id: uuidv4(),
+      chatId,
+      message,
+      time: new Date(time),
+      sent: false
+    });
+  }
+
+  async processScheduledMessages() {
+    const now = new Date();
+    for (const scheduled of this.scheduledMessages) {
+      if (!scheduled.sent && scheduled.time <= now) {
+        try {
+          await this.client.sendMessage(scheduled.chatId, scheduled.message);
+          scheduled.sent = true;
+        } catch (error) {
+          console.error('Error sending scheduled message:', error);
+        }
+      }
+    }
+  }
+
+  async downloadMedia(message) {
+    if (!message.hasMedia) return null;
+    
+    try {
+      const media = await message.downloadMedia();
+      const filename = `${Date.now()}-${message.type}`;
+      const filepath = path.join(__dirname, 'downloads', filename);
+      
+      await fs.ensureDir(path.dirname(filepath));
+      await fs.writeFile(filepath, media.data, 'base64');
+      
+      return filepath;
+    } catch (error) {
+      console.error('Error downloading media:', error);
+      return null;
+    }
+  }
 }
 
 // Initialize directories
@@ -826,11 +958,6 @@ async function initializeServer() {
     await fs.ensureDir(path.join(__dirname, 'sessions'));
     await fs.ensureDir(path.join(__dirname, 'uploads'));
     await fs.ensureDir(path.join(__dirname, 'downloads'));
-    await fs.ensureDir(path.join(__dirname, 'config'));
-    await fs.ensureDir(path.join(__dirname, 'Connect/lib'));
-    await fs.ensureDir(path.join(__dirname, 'Connect/plugin'));
-    await fs.ensureDir(path.join(__dirname, 'Connect/language'));
-    await fs.ensureDir(path.join(__dirname, 'Connect/database/react'));
     console.log('✅ Server directories initialized');
   } catch (error) {
     console.error('❌ Error initializing directories:', error);
@@ -870,21 +997,6 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // Check for admin login
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      const token = jwt.sign({ admin: true, username: ADMIN_USERNAME }, JWT_SECRET);
-      return res.json({ 
-        token, 
-        admin: true,
-        user: {
-          id: 'admin',
-          username: ADMIN_USERNAME,
-          email: ADMIN_EMAIL,
-          isAdmin: true
-        }
-      });
-    }
-    
     const user = users.find(u => u.email === email);
     if (!user || !await bcrypt.compare(password, user.password)) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -912,7 +1024,7 @@ app.post('/api/admin/login', (req, res) => {
     const { username, password } = req.body;
     
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      const token = jwt.sign({ admin: true, username: ADMIN_USERNAME }, JWT_SECRET);
+      const token = jwt.sign({ admin: true }, JWT_SECRET);
       res.json({ token, admin: true });
     } else {
       res.status(401).json({ error: 'Invalid admin credentials' });
@@ -943,7 +1055,7 @@ const authenticateToken = (req, res, next) => {
 app.post('/api/bot/connect', authenticateToken, async (req, res) => {
   try {
     const { method } = req.body;
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     
     console.log(`Bot connection request from user ${userId} using method: ${method}`);
     
@@ -952,6 +1064,7 @@ app.post('/api/bot/connect', authenticateToken, async (req, res) => {
       if (existingBot.isConnected) {
         return res.status(400).json({ error: 'Bot already connected' });
       }
+      // Clean up existing bot if not connected
       await existingBot.disconnect();
       activeBots.delete(userId);
     }
@@ -986,7 +1099,7 @@ app.post('/api/bot/connect', authenticateToken, async (req, res) => {
 
 app.post('/api/bot/disconnect', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     const bot = activeBots.get(userId);
     
     if (bot) {
@@ -1001,60 +1114,9 @@ app.post('/api/bot/disconnect', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/bot/pause', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId || req.user.username;
-    const bot = activeBots.get(userId);
-    
-    if (bot) {
-      bot.pause();
-      res.json({ success: true, paused: true });
-    } else {
-      res.status(404).json({ error: 'Bot not found' });
-    }
-  } catch (error) {
-    console.error('Bot pause error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/bot/resume', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId || req.user.username;
-    const bot = activeBots.get(userId);
-    
-    if (bot) {
-      bot.resume();
-      res.json({ success: true, paused: false });
-    } else {
-      res.status(404).json({ error: 'Bot not found' });
-    }
-  } catch (error) {
-    console.error('Bot resume error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/bot/restart', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId || req.user.username;
-    const bot = activeBots.get(userId);
-    
-    if (bot) {
-      await bot.restart();
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: 'Bot not found' });
-    }
-  } catch (error) {
-    console.error('Bot restart error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 app.get('/api/bot/status', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     const bot = activeBots.get(userId);
     
     if (!bot || !bot.isConnected) {
@@ -1069,8 +1131,7 @@ app.get('/api/bot/status', authenticateToken, async (req, res) => {
           activeUsers: 0,
           bannedUsers: 0,
           ramUsage: 0, 
-          cpuUsage: 0,
-          isPaused: false
+          cpuUsage: 0 
         } 
       });
     }
@@ -1090,10 +1151,11 @@ app.get('/api/bot/status', authenticateToken, async (req, res) => {
 // Bot Settings Routes
 app.get('/api/bot/settings', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     const bot = activeBots.get(userId);
     
     if (!bot) {
+      // Return default settings if no bot exists
       const defaultBot = new AdvancedWhatsAppBot(userId, io);
       return res.json(defaultBot.getSettings());
     }
@@ -1107,10 +1169,11 @@ app.get('/api/bot/settings', authenticateToken, async (req, res) => {
 
 app.post('/api/bot/settings', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     let bot = activeBots.get(userId);
     
     if (!bot) {
+      // Create a new bot instance if none exists
       bot = new AdvancedWhatsAppBot(userId, io);
       activeBots.set(userId, bot);
     }
@@ -1126,7 +1189,7 @@ app.post('/api/bot/settings', authenticateToken, async (req, res) => {
 // Chat Routes
 app.get('/api/bot/chats', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     const bot = activeBots.get(userId);
     
     if (!bot || !bot.isConnected) {
@@ -1143,7 +1206,7 @@ app.get('/api/bot/chats', authenticateToken, async (req, res) => {
 
 app.get('/api/bot/chats/:chatId/messages', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     const { chatId } = req.params;
     const bot = activeBots.get(userId);
     
@@ -1161,7 +1224,7 @@ app.get('/api/bot/chats/:chatId/messages', authenticateToken, async (req, res) =
 
 app.post('/api/bot/chats/:chatId/send', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.username;
+    const userId = req.user.userId;
     const { chatId } = req.params;
     const { message } = req.body;
     const bot = activeBots.get(userId);
@@ -1178,23 +1241,58 @@ app.post('/api/bot/chats/:chatId/send', authenticateToken, async (req, res) => {
   }
 });
 
-// Plugin management routes
-app.get('/api/bot/plugins', authenticateToken, async (req, res) => {
+// Advanced Bot Features Routes
+app.post('/api/bot/send-message', authenticateToken, async (req, res) => {
   try {
-    const commands = pluginLoader.getCommands();
-    res.json({ commands });
+    const userId = req.user.userId;
+    const bot = activeBots.get(userId);
+    const { chatId, message } = req.body;
+    
+    if (!bot || !bot.isConnected) {
+      return res.status(400).json({ error: 'Bot not connected' });
+    }
+    
+    await bot.client.sendMessage(chatId, message);
+    res.json({ success: true });
   } catch (error) {
-    console.error('Get plugins error:', error);
+    console.error('Send message error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/bot/plugins/reload', authenticateToken, async (req, res) => {
+app.post('/api/bot/schedule-message', authenticateToken, async (req, res) => {
   try {
-    await pluginLoader.reloadPlugins();
-    res.json({ success: true, message: 'Plugins reloaded successfully' });
+    const userId = req.user.userId;
+    const bot = activeBots.get(userId);
+    const { chatId, message, time } = req.body;
+    
+    if (!bot) {
+      return res.status(400).json({ error: 'Bot not found' });
+    }
+    
+    await bot.scheduleMessage(chatId, message, time);
+    res.json({ success: true });
   } catch (error) {
-    console.error('Reload plugins error:', error);
+    console.error('Schedule message error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// File upload route
+app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    res.json({
+      success: true,
+      filename: req.file.filename,
+      path: req.file.path,
+      size: req.file.size
+    });
+  } catch (error) {
+    console.error('File upload error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1260,9 +1358,10 @@ io.on('connection', (socket) => {
 
 // Scheduled tasks
 cron.schedule('* * * * *', () => {
+  // Process scheduled messages every minute
   activeBots.forEach(bot => {
     if (bot.isConnected) {
-      bot.processScheduledMessages && bot.processScheduledMessages();
+      bot.processScheduledMessages();
     }
   });
 });
@@ -1289,9 +1388,8 @@ async function startServer() {
       console.log(`📱 API Base URL: http://localhost:${PORT}/api`);
       console.log(`💡 Health Check: http://localhost:${PORT}/api/health`);
       console.log(`👤 Demo Login: demo@example.com / password`);
-      console.log(`👑 Admin Login: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+      console.log(`👑 Admin Login: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}`);
       console.log(`🤖 WhatsApp Web.js Integration: Active`);
-      console.log(`🔌 Plugin System: Loaded`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
