@@ -1,4 +1,4 @@
-const { Queen } = require("../lib");
+const { Queen } = require("../lib/event");
 
 Queen.addCommand({
   pattern: ["weather"],
@@ -72,6 +72,21 @@ Queen.addCommand({
   
   const text = args.join(' ');
   await client.sendMessage(message.key.remoteJid, { text: Queen.infoMessage(`QR code for: ${text}\n(QR generation feature coming soon!)`) });
+});
+
+Queen.addCommand({
+  pattern: ["time"],
+  category: "utility",
+  onlyPm: false,
+  onlyGroup: false,
+  React: "⏰",
+  desc: "Get current time",
+  usage: ".time"
+}, async (message, client) => {
+  const now = new Date();
+  const timeText = `⏰ *Current Time*\n\n📅 Date: ${now.toDateString()}\n🕐 Time: ${now.toLocaleTimeString()}\n🌍 Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
+  
+  await client.sendMessage(message.key.remoteJid, { text: timeText });
 });
 
 module.exports = {};

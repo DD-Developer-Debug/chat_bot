@@ -4,47 +4,32 @@ import {
   Bot, 
   QrCode, 
   Smartphone, 
-  Settings, 
-  BarChart3, 
-  MessageSquare, 
-  Users, 
   Activity, 
+  Users, 
+  MessageSquare, 
+  Settings, 
   LogOut,
   Wifi,
   WifiOff,
+  Play,
+  Pause,
+  RotateCcw,
+  MessageCircle,
   Send,
-  Search,
-  MoreVertical,
   Phone,
-  Video,
-  Paperclip,
-  Smile,
-  ArrowLeft,
-  CheckCheck,
-  Check,
-  Clock,
-  User,
-  Github,
   Mail,
+  Github,
+  ExternalLink,
+  User,
+  Shield,
+  Zap,
   Globe,
+  Command,
   Heart,
   Star,
+  Coffee,
   Code,
-  Zap,
-  Shield,
-  Cpu,
-  HardDrive,
-  Download,
-  Upload,
-  Eye,
-  EyeOff,
-  Copy,
-  ExternalLink,
-  MessageCircle,
-  Calendar,
-  MapPin,
-  Award,
-  Briefcase
+  Headphones
 } from 'lucide-react';
 
 interface BotStats {
@@ -59,28 +44,6 @@ interface BotStats {
   cpuUsage: number;
 }
 
-interface Chat {
-  id: string;
-  name: string;
-  isGroup: boolean;
-  unreadCount: number;
-  lastMessage?: {
-    body: string;
-    timestamp: number;
-    fromMe: boolean;
-  };
-  profilePicUrl?: string;
-}
-
-interface Message {
-  id: string;
-  body: string;
-  timestamp: number;
-  fromMe: boolean;
-  type: string;
-  hasMedia: boolean;
-}
-
 interface BotSettings {
   botName: string;
   prefix: string;
@@ -93,13 +56,6 @@ interface BotSettings {
   antiLink: boolean;
   antiSpam: boolean;
   autoReply: boolean;
-  autoReplyText: string;
-  autoReplyEnabled: boolean;
-  welcomeText: string;
-  enabledCommands: Record<string, boolean>;
-  workMode: string;
-  responseDelay: number;
-  maxMessagesPerMinute: number;
   aiChatbot: boolean;
   voiceToText: boolean;
   textToVoice: boolean;
@@ -112,24 +68,55 @@ interface BotSettings {
   groupAdminOnly: boolean;
   blockUnknown: boolean;
   antiFlood: boolean;
+  maxMessagesPerMinute: number;
   maxDownloadSize: string;
   allowedFileTypes: string[];
   autoDownloadMedia: boolean;
   compressImages: boolean;
+  responseDelay: number;
+  workMode: string;
   logMessages: boolean;
   saveMedia: boolean;
   notifyOnCommand: boolean;
   notifyOnError: boolean;
   notifyOnNewUser: boolean;
   notifyOnGroupJoin: boolean;
+  autoReplyText: string;
+  autoReplyEnabled: boolean;
+  welcomeText: string;
+  enabledCommands: Record<string, boolean>;
+}
+
+interface Chat {
+  id: string;
+  name: string;
+  isGroup: boolean;
+  unreadCount: number;
+  lastMessage?: {
+    body: string;
+    timestamp: number;
+    fromMe: boolean;
+  };
+}
+
+interface Message {
+  id: string;
+  body: string;
+  timestamp: number;
+  fromMe: boolean;
+  type: string;
+  hasMedia: boolean;
 }
 
 export default function Dashboard() {
-  const { user, logout, token } = useAuth();
-  const [activeTab, setActiveTab] = useState('connect');
+  const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview');
   const [botConnected, setBotConnected] = useState(false);
+  const [botPaused, setBotPaused] = useState(false);
   const [qrCode, setQrCode] = useState('');
-  const [showQR, setShowQR] = useState(false);
+  const [connectionMethod, setConnectionMethod] = useState('qr');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<BotStats>({
@@ -155,13 +142,6 @@ export default function Dashboard() {
     antiLink: false,
     antiSpam: true,
     autoReply: false,
-    autoReplyText: 'Hello! I am currently unavailable. I will get back to you soon.',
-    autoReplyEnabled: false,
-    welcomeText: 'Welcome to our group! Please read the rules and enjoy your stay.',
-    enabledCommands: {},
-    workMode: 'public',
-    responseDelay: 1000,
-    maxMessagesPerMinute: 10,
     aiChatbot: false,
     voiceToText: false,
     textToVoice: false,
@@ -174,139 +154,111 @@ export default function Dashboard() {
     groupAdminOnly: false,
     blockUnknown: false,
     antiFlood: true,
+    maxMessagesPerMinute: 10,
     maxDownloadSize: '100MB',
     allowedFileTypes: ['image', 'video', 'audio', 'document'],
     autoDownloadMedia: false,
     compressImages: true,
+    responseDelay: 1000,
+    workMode: 'public',
     logMessages: true,
     saveMedia: true,
     notifyOnCommand: true,
     notifyOnError: true,
     notifyOnNewUser: false,
-    notifyOnGroupJoin: true
+    notifyOnGroupJoin: true,
+    autoReplyText: 'Hello! I am currently unavailable. I will get back to you soon.',
+    autoReplyEnabled: false,
+    welcomeText: 'Welcome to our group! Please read the rules and enjoy your stay.',
+    enabledCommands: {
+      ping: true,
+      help: true,
+      info: true,
+      weather: true,
+      translate: true,
+      sticker: true,
+      download: true,
+      ai: true,
+      news: true,
+      reminder: true,
+      ban: true,
+      unban: true,
+      kick: true,
+      promote: true,
+      demote: true,
+      mute: true,
+      unmute: true,
+      everyone: true,
+      tagall: true
+    }
   });
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Initialize Socket.IO connection
-    const socket = new WebSocket(`ws://localhost:3001`);
-    
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'qr-code' && data.userId === user?.id) {
-        setQrCode(data.qrCode);
-        setShowQR(true);
-      } else if (data.type === 'qr-hidden' && data.userId === user?.id) {
-        setShowQR(false);
-        setQrCode('');
-      } else if (data.type === 'bot-connected' && data.userId === user?.id) {
-        setBotConnected(true);
-        setLoading(false);
-        setError('');
-        setShowQR(false);
-        fetchChats();
-      } else if (data.type === 'bot-disconnected' && data.userId === user?.id) {
-        setBotConnected(false);
-      } else if (data.type === 'chats-updated' && data.userId === user?.id) {
-        setChats(data.chats);
-      } else if (data.type === 'new-message' && data.userId === user?.id) {
-        if (selectedChat && data.chatId === selectedChat.id) {
-          setMessages(prev => [...prev, data.message]);
-        }
-      } else if (data.type === 'bot-error' && data.userId === user?.id) {
-        setError(data.error);
-        setLoading(false);
-      }
-    };
-
-    // Check initial bot status
     checkBotStatus();
-    fetchSettings();
-
-    return () => {
-      socket.close();
-    };
-  }, [user?.id]);
+    loadSettings();
+    const interval = setInterval(() => {
+      if (botConnected) {
+        checkBotStatus();
+        loadChats();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [botConnected]);
 
   const checkBotStatus = async () => {
     try {
       const response = await fetch('/api/bot/status', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setBotConnected(data.connected);
+      const data = await response.json();
+      setBotConnected(data.connected);
+      if (data.connected) {
         setStats(data.stats);
-        
-        if (data.connected) {
-          fetchChats();
-        }
       }
     } catch (error) {
       console.error('Error checking bot status:', error);
     }
   };
 
-  const fetchSettings = async () => {
+  const loadSettings = async () => {
     try {
       const response = await fetch('/api/bot/settings', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('Error loading settings:', error);
     }
   };
 
-  const fetchChats = async () => {
+  const loadChats = async () => {
     try {
       const response = await fetch('/api/bot/chats', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
       if (response.ok) {
         const data = await response.json();
         setChats(data);
       }
     } catch (error) {
-      console.error('Error fetching chats:', error);
+      console.error('Error loading chats:', error);
     }
   };
 
-  const fetchMessages = async (chatId: string) => {
-    try {
-      const response = await fetch(`/api/bot/chats/${chatId}/messages`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data);
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  };
-
-  const connectBot = async (method: 'qr' | 'pairing') => {
+  const connectBot = async () => {
     setLoading(true);
     setError('');
     
@@ -315,67 +267,75 @@ export default function Dashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ method })
+        body: JSON.stringify({
+          method: connectionMethod,
+          phoneNumber: connectionMethod === 'pairing' ? phoneNumber : undefined
+        })
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Connection failed');
-      }
-      
+
       const data = await response.json();
       
-      if (data.qrCode) {
-        setQrCode(data.qrCode);
-        setShowQR(true);
-      } else if (data.message) {
-        setBotConnected(true);
-        setLoading(false);
-        fetchChats();
+      if (response.ok) {
+        if (data.qrCode) {
+          setQrCode(data.qrCode);
+        }
+        if (data.pairingCode) {
+          setPairingCode(data.pairingCode);
+        }
+      } else {
+        setError(data.error);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection failed');
+    } catch (error) {
+      setError('Failed to connect bot');
+    } finally {
       setLoading(false);
     }
   };
 
   const disconnectBot = async () => {
     try {
-      const response = await fetch('/api/bot/disconnect', {
+      await fetch('/api/bot/disconnect', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
-      if (response.ok) {
-        setBotConnected(false);
-        setQrCode('');
-        setShowQR(false);
-        setChats([]);
-        setSelectedChat(null);
-        setMessages([]);
-      }
+      setBotConnected(false);
+      setQrCode('');
+      setPairingCode('');
     } catch (error) {
       console.error('Error disconnecting bot:', error);
     }
   };
 
+  const pauseBot = () => {
+    setBotPaused(!botPaused);
+    // Implement pause/resume logic
+  };
+
+  const restartBot = async () => {
+    await disconnectBot();
+    setTimeout(() => {
+      connectBot();
+    }, 2000);
+  };
+
   const updateSettings = async (newSettings: Partial<BotSettings>) => {
     try {
+      const updatedSettings = { ...settings, ...newSettings };
       const response = await fetch('/api/bot/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(newSettings)
+        body: JSON.stringify(updatedSettings)
       });
-      
+
       if (response.ok) {
-        setSettings(prev => ({ ...prev, ...newSettings }));
+        setSettings(updatedSettings);
       }
     } catch (error) {
       console.error('Error updating settings:', error);
@@ -383,59 +343,598 @@ export default function Dashboard() {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChat) return;
-    
+    if (!selectedChat || !newMessage.trim()) return;
+
     try {
-      const response = await fetch(`/api/bot/chats/${selectedChat.id}/send`, {
+      await fetch(`/api/bot/chats/${selectedChat.id}/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({ message: newMessage })
       });
-      
-      if (response.ok) {
-        setNewMessage('');
-        // Message will be added via socket event
-      }
+      setNewMessage('');
+      // Reload messages
+      loadChatMessages(selectedChat.id);
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
 
-  const selectChat = (chat: Chat) => {
-    setSelectedChat(chat);
-    fetchMessages(chat.id);
-  };
-
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff < 24 * 60 * 60 * 1000) {
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
+  const loadChatMessages = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/bot/chats/${chatId}/messages`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
-      });
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
     }
   };
 
   const formatUptime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
   };
 
-  const filteredChats = chats.filter(chat =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const renderOverview = () => (
+    <div className="space-y-6">
+      {/* Connection Status */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">Bot Connection</h3>
+          <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${
+            botConnected ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+          }`}>
+            {botConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+            <span className="text-sm font-medium">
+              {botConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+        </div>
+
+        {!botConnected ? (
+          <div className="space-y-4">
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setConnectionMethod('qr')}
+                className={`flex-1 p-3 rounded-lg border transition-colors ${
+                  connectionMethod === 'qr'
+                    ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                    : 'bg-white/5 border-white/20 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                <QrCode className="w-5 h-5 mx-auto mb-2" />
+                <div className="text-sm font-medium">QR Code</div>
+              </button>
+              <button
+                onClick={() => setConnectionMethod('pairing')}
+                className={`flex-1 p-3 rounded-lg border transition-colors ${
+                  connectionMethod === 'pairing'
+                    ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                    : 'bg-white/5 border-white/20 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                <Smartphone className="w-5 h-5 mx-auto mb-2" />
+                <div className="text-sm font-medium">Pairing Code</div>
+              </button>
+            </div>
+
+            {connectionMethod === 'pairing' && (
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter phone number (e.g., +1234567890)"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            )}
+
+            <button
+              onClick={connectBot}
+              disabled={loading || (connectionMethod === 'pairing' && !phoneNumber)}
+              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold py-3 px-4 rounded-lg hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {loading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <Bot className="w-5 h-5 mr-2" />
+                  Connect Bot
+                </>
+              )}
+            </button>
+
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3">
+                <p className="text-red-300 text-sm">{error}</p>
+              </div>
+            )}
+
+            {qrCode && (
+              <div className="text-center">
+                <p className="text-white/70 mb-4">Scan this QR code with WhatsApp:</p>
+                <img src={qrCode} alt="QR Code" className="mx-auto rounded-lg" />
+              </div>
+            )}
+
+            {pairingCode && (
+              <div className="text-center bg-white/10 rounded-lg p-4">
+                <p className="text-white/70 mb-2">Enter this pairing code in WhatsApp:</p>
+                <p className="text-2xl font-mono font-bold text-white">{pairingCode}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex space-x-3">
+              <button
+                onClick={pauseBot}
+                className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg transition-colors ${
+                  botPaused 
+                    ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' 
+                    : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30'
+                }`}
+              >
+                {botPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                <span>{botPaused ? 'Resume' : 'Pause'}</span>
+              </button>
+              <button
+                onClick={restartBot}
+                className="flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Restart</span>
+              </button>
+              <button
+                onClick={disconnectBot}
+                className="flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+              >
+                <WifiOff className="w-4 h-4" />
+                <span>Disconnect</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stats Grid */}
+      {botConnected && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white/70 text-sm">Uptime</p>
+                <p className="text-xl font-bold text-white">{formatUptime(stats.uptime)}</p>
+              </div>
+              <Activity className="w-8 h-8 text-green-400" />
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white/70 text-sm">Total Users</p>
+                <p className="text-xl font-bold text-white">{stats.totalUsers}</p>
+              </div>
+              <Users className="w-8 h-8 text-blue-400" />
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white/70 text-sm">Messages</p>
+                <p className="text-xl font-bold text-white">{stats.messageCount}</p>
+              </div>
+              <MessageSquare className="w-8 h-8 text-purple-400" />
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white/70 text-sm">Commands</p>
+                <p className="text-xl font-bold text-white">{stats.totalCommands}</p>
+              </div>
+              <Command className="w-8 h-8 text-orange-400" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="space-y-6">
+      {/* Basic Settings */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Basic Settings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-white/70 text-sm font-medium mb-2">Bot Name</label>
+            <input
+              type="text"
+              value={settings.botName}
+              onChange={(e) => updateSettings({ botName: e.target.value })}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-white/70 text-sm font-medium mb-2">Command Prefix</label>
+            <input
+              type="text"
+              value={settings.prefix}
+              onChange={(e) => updateSettings({ prefix: e.target.value })}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-white/70 text-sm font-medium mb-2">Language</label>
+            <select
+              value={settings.language}
+              onChange={(e) => updateSettings({ language: e.target.value })}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="EN" className="bg-gray-800">English</option>
+              <option value="SI" className="bg-gray-800">Sinhala</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-white/70 text-sm font-medium mb-2">Owner Number</label>
+            <input
+              type="tel"
+              value={settings.ownerNumber}
+              onChange={(e) => updateSettings({ ownerNumber: e.target.value })}
+              placeholder="+1234567890"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Behavior Settings */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Behavior Settings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { key: 'autoReact', label: 'Auto React', icon: Heart },
+            { key: 'autoRead', label: 'Auto Read', icon: MessageCircle },
+            { key: 'autoTyping', label: 'Auto Typing', icon: MessageSquare },
+            { key: 'welcomeMessage', label: 'Welcome Message', icon: Users },
+            { key: 'antiLink', label: 'Anti Link', icon: Shield },
+            { key: 'antiSpam', label: 'Anti Spam', icon: Shield },
+            { key: 'autoReply', label: 'Auto Reply', icon: MessageCircle },
+            { key: 'groupManagement', label: 'Group Management', icon: Users },
+            { key: 'logMessages', label: 'Log Messages', icon: MessageSquare }
+          ].map(({ key, label, icon: Icon }) => (
+            <div key={key} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <Icon className="w-5 h-5 text-purple-400" />
+                <span className="text-white/80">{label}</span>
+              </div>
+              <button
+                onClick={() => updateSettings({ [key]: !settings[key as keyof BotSettings] })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings[key as keyof BotSettings] ? 'bg-purple-500' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings[key as keyof BotSettings] ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Advanced Features */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Advanced Features</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { key: 'aiChatbot', label: 'AI Chatbot', icon: Bot },
+            { key: 'voiceToText', label: 'Voice to Text', icon: Headphones },
+            { key: 'textToVoice', label: 'Text to Voice', icon: MessageCircle },
+            { key: 'imageGeneration', label: 'Image Generation', icon: Star },
+            { key: 'weatherUpdates', label: 'Weather Updates', icon: Globe },
+            { key: 'newsUpdates', label: 'News Updates', icon: Globe },
+            { key: 'reminderSystem', label: 'Reminder System', icon: Zap },
+            { key: 'autoDownloadMedia', label: 'Auto Download Media', icon: MessageSquare },
+            { key: 'compressImages', label: 'Compress Images', icon: Star }
+          ].map(({ key, label, icon: Icon }) => (
+            <div key={key} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <Icon className="w-5 h-5 text-blue-400" />
+                <span className="text-white/80">{label}</span>
+              </div>
+              <button
+                onClick={() => updateSettings({ [key]: !settings[key as keyof BotSettings] })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings[key as keyof BotSettings] ? 'bg-blue-500' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings[key as keyof BotSettings] ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Message Settings */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Message Settings</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-white/70 text-sm font-medium mb-2">Auto Reply Text</label>
+            <textarea
+              value={settings.autoReplyText}
+              onChange={(e) => updateSettings({ autoReplyText: e.target.value })}
+              rows={3}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-white/70 text-sm font-medium mb-2">Welcome Text</label>
+            <textarea
+              value={settings.welcomeText}
+              onChange={(e) => updateSettings({ welcomeText: e.target.value })}
+              rows={3}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-white/70 text-sm font-medium mb-2">Response Delay (ms)</label>
+              <input
+                type="number"
+                value={settings.responseDelay}
+                onChange={(e) => updateSettings({ responseDelay: parseInt(e.target.value) })}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <div>
+              <label className="block text-white/70 text-sm font-medium mb-2">Max Messages/Minute</label>
+              <input
+                type="number"
+                value={settings.maxMessagesPerMinute}
+                onChange={(e) => updateSettings({ maxMessagesPerMinute: parseInt(e.target.value) })}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderChats = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+      {/* Chat List */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-4">
+        <h3 className="text-lg font-semibold text-white mb-4">Chats</h3>
+        <div className="space-y-2 max-h-[500px] overflow-y-auto">
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              onClick={() => {
+                setSelectedChat(chat);
+                loadChatMessages(chat.id);
+              }}
+              className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                selectedChat?.id === chat.id
+                  ? 'bg-purple-500/20 border border-purple-500/50'
+                  : 'bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">{chat.name}</p>
+                  {chat.lastMessage && (
+                    <p className="text-white/60 text-sm truncate">
+                      {chat.lastMessage.fromMe ? 'You: ' : ''}{chat.lastMessage.body}
+                    </p>
+                  )}
+                </div>
+                {chat.unreadCount > 0 && (
+                  <span className="bg-purple-500 text-white text-xs rounded-full px-2 py-1 ml-2">
+                    {chat.unreadCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Chat Messages */}
+      <div className="lg:col-span-2 bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 flex flex-col">
+        {selectedChat ? (
+          <>
+            <div className="p-4 border-b border-white/20">
+              <h3 className="text-lg font-semibold text-white">{selectedChat.name}</h3>
+              <p className="text-white/60 text-sm">
+                {selectedChat.isGroup ? 'Group Chat' : 'Private Chat'}
+              </p>
+            </div>
+            
+            <div className="flex-1 p-4 overflow-y-auto space-y-3">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                      message.fromMe
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-white/20 text-white'
+                    }`}
+                  >
+                    <p className="text-sm">{message.body}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {new Date(message.timestamp * 1000).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="p-4 border-t border-white/20">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <button
+                  onClick={sendMessage}
+                  className="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded-lg transition-colors"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <MessageCircle className="w-16 h-16 text-white/40 mx-auto mb-4" />
+              <p className="text-white/60">Select a chat to start messaging</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDeveloper = () => (
+    <div className="space-y-6">
+      {/* Developer Info */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <div className="text-center mb-6">
+          <div className="bg-gradient-to-r from-purple-500 to-blue-500 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4">
+            <User className="w-12 h-12 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">DarkWinzo</h2>
+          <p className="text-white/70">Full Stack Developer & Bot Creator</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="text-center p-4 bg-white/5 rounded-lg">
+            <Code className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+            <p className="text-white font-semibold">5+ Years</p>
+            <p className="text-white/60 text-sm">Experience</p>
+          </div>
+          <div className="text-center p-4 bg-white/5 rounded-lg">
+            <Bot className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+            <p className="text-white font-semibold">50+ Bots</p>
+            <p className="text-white/60 text-sm">Created</p>
+          </div>
+          <div className="text-center p-4 bg-white/5 rounded-lg">
+            <Users className="w-8 h-8 text-green-400 mx-auto mb-2" />
+            <p className="text-white font-semibold">10K+ Users</p>
+            <p className="text-white/60 text-sm">Served</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <a
+            href="mailto:isurulakshan9998@gmail.com"
+            className="flex items-center space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group"
+          >
+            <Mail className="w-6 h-6 text-red-400" />
+            <div className="flex-1">
+              <p className="text-white font-medium">Email</p>
+              <p className="text-white/60 text-sm">isurulakshan9998@gmail.com</p>
+            </div>
+            <ExternalLink className="w-5 h-5 text-white/40 group-hover:text-white/60" />
+          </a>
+
+          <a
+            href="https://github.com/DarkWinzo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-3 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group"
+          >
+            <Github className="w-6 h-6 text-gray-400" />
+            <div className="flex-1">
+              <p className="text-white font-medium">GitHub</p>
+              <p className="text-white/60 text-sm">github.com/DarkWinzo</p>
+            </div>
+            <ExternalLink className="w-5 h-5 text-white/40 group-hover:text-white/60" />
+          </a>
+
+          <div className="flex items-center space-x-3 p-4 bg-white/5 rounded-lg">
+            <Phone className="w-6 h-6 text-green-400" />
+            <div className="flex-1">
+              <p className="text-white font-medium">WhatsApp Support</p>
+              <p className="text-white/60 text-sm">Available 24/7 for premium users</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Skills & Technologies */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Skills & Technologies</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            'JavaScript', 'TypeScript', 'Node.js', 'React',
+            'Python', 'WhatsApp API', 'Bot Development', 'AI/ML',
+            'Database Design', 'Cloud Computing', 'DevOps', 'UI/UX'
+          ].map((skill) => (
+            <div key={skill} className="bg-white/5 rounded-lg p-3 text-center">
+              <p className="text-white/80 text-sm font-medium">{skill}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Support & Services */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Support & Services</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 bg-white/5 rounded-lg">
+            <Coffee className="w-8 h-8 text-yellow-400 mb-3" />
+            <h4 className="text-white font-semibold mb-2">Custom Bot Development</h4>
+            <p className="text-white/60 text-sm">Get a custom WhatsApp bot tailored to your specific needs</p>
+          </div>
+          <div className="p-4 bg-white/5 rounded-lg">
+            <Headphones className="w-8 h-8 text-blue-400 mb-3" />
+            <h4 className="text-white font-semibold mb-2">24/7 Support</h4>
+            <p className="text-white/60 text-sm">Premium support for all your bot-related queries</p>
+          </div>
+          <div className="p-4 bg-white/5 rounded-lg">
+            <Star className="w-8 h-8 text-purple-400 mb-3" />
+            <h4 className="text-white font-semibold mb-2">Feature Requests</h4>
+            <p className="text-white/60 text-sm">Suggest new features and improvements</p>
+          </div>
+          <div className="p-4 bg-white/5 rounded-lg">
+            <Zap className="w-8 h-8 text-green-400 mb-3" />
+            <h4 className="text-white font-semibold mb-2">Performance Optimization</h4>
+            <p className="text-white/60 text-sm">Optimize your bot for better performance</p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   return (
@@ -449,919 +948,50 @@ export default function Dashboard() {
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Queen Bot Dashboard</h1>
+                <h1 className="text-2xl font-bold text-white">WhatsApp Bot Dashboard</h1>
                 <p className="text-white/70">Welcome back, {user?.username}!</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                {botConnected ? (
-                  <div className="flex items-center space-x-2 text-green-400">
-                    <Wifi className="w-5 h-5" />
-                    <span className="text-sm font-medium">Connected</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-2 text-red-400">
-                    <WifiOff className="w-5 h-5" />
-                    <span className="text-sm font-medium">Disconnected</span>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={logout}
-                className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              onClick={logout}
+              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 p-2 mb-6">
-          <div className="flex space-x-2 overflow-x-auto">
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-2 mb-6">
+          <div className="flex space-x-2">
             {[
-              { id: 'connect', label: 'Connect', icon: QrCode },
-              { id: 'chats', label: 'Chats', icon: MessageSquare },
-              { id: 'stats', label: 'Statistics', icon: BarChart3 },
+              { id: 'overview', label: 'Overview', icon: Activity },
               { id: 'settings', label: 'Settings', icon: Settings },
-              { id: 'developer', label: 'Developer', icon: Code }
-            ].map((tab) => (
+              { id: 'chats', label: 'Chats', icon: MessageCircle },
+              { id: 'developer', label: 'Developer', icon: User }
+            ].map(({ id, label, icon: Icon }) => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === id
+                    ? 'bg-purple-500 text-white'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <tab.icon className="w-4 h-4" />
-                <span>{tab.label}</span>
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Tab Content */}
-        <div className="space-y-6">
-          {/* Connect Tab */}
-          {activeTab === 'connect' && (
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 p-8">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-white mb-4">Connect Your WhatsApp</h2>
-                <p className="text-white/70 mb-8">Choose a method to connect your WhatsApp account</p>
-                
-                {!botConnected ? (
-                  <div className="space-y-6">
-                    {showQR && qrCode ? (
-                      <div className="max-w-md mx-auto">
-                        <div className="bg-white p-6 rounded-2xl shadow-2xl">
-                          <img src={qrCode} alt="QR Code" className="w-full h-auto" />
-                        </div>
-                        <p className="text-white/70 mt-4">Scan this QR code with your WhatsApp</p>
-                        <div className="flex justify-center mt-4">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-                        <button
-                          onClick={() => connectBot('qr')}
-                          disabled={loading}
-                          className="bg-gradient-to-r from-green-500 to-emerald-500 text-white p-6 rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <QrCode className="w-12 h-12 mx-auto mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">QR Code</h3>
-                          <p className="text-sm opacity-90">Scan QR code with WhatsApp</p>
-                        </button>
-                        
-                        <button
-                          onClick={() => connectBot('pairing')}
-                          disabled={true}
-                          className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white p-6 rounded-xl opacity-50 cursor-not-allowed"
-                        >
-                          <Smartphone className="w-12 h-12 mx-auto mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">Pairing Code</h3>
-                          <p className="text-sm opacity-90">Coming Soon</p>
-                        </button>
-                      </div>
-                    )}
-                    
-                    {loading && !showQR && (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                        <span className="text-white">Initializing bot...</span>
-                      </div>
-                    )}
-                    
-                    {error && (
-                      <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 max-w-md mx-auto">
-                        <p className="text-red-300">{error}</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-6 max-w-md mx-auto">
-                      <div className="flex items-center justify-center space-x-2 mb-4">
-                        <Wifi className="w-6 h-6 text-green-400" />
-                        <span className="text-green-400 font-semibold">Bot Connected Successfully!</span>
-                      </div>
-                      <p className="text-white/70">Your WhatsApp bot is now active and ready to use.</p>
-                    </div>
-                    
-                    <button
-                      onClick={disconnectBot}
-                      className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                    >
-                      Disconnect Bot
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Chats Tab */}
-          {activeTab === 'chats' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-              {/* Chat List */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 flex flex-col">
-                <div className="p-4 border-b border-white/20">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />
-                    <input
-                      type="text"
-                      placeholder="Search chats..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg pl-10 pr-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto">
-                  {botConnected ? (
-                    filteredChats.length > 0 ? (
-                      filteredChats.map((chat) => (
-                        <div
-                          key={chat.id}
-                          onClick={() => selectChat(chat)}
-                          className={`p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors ${
-                            selectedChat?.id === chat.id ? 'bg-white/10' : ''
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                              {chat.isGroup ? (
-                                <Users className="w-6 h-6 text-white" />
-                              ) : (
-                                <span className="text-white font-semibold">
-                                  {chat.name.charAt(0).toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-white font-medium truncate">{chat.name}</h3>
-                                {chat.lastMessage && (
-                                  <span className="text-white/50 text-xs">
-                                    {formatTime(chat.lastMessage.timestamp)}
-                                  </span>
-                                )}
-                              </div>
-                              {chat.lastMessage && (
-                                <p className="text-white/70 text-sm truncate">
-                                  {chat.lastMessage.fromMe ? 'You: ' : ''}
-                                  {chat.lastMessage.body}
-                                </p>
-                              )}
-                            </div>
-                            {chat.unreadCount > 0 && (
-                              <div className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                {chat.unreadCount}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <p className="text-white/50">No chats found</p>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-white/50">Connect your bot to view chats</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Chat Messages */}
-              <div className="lg:col-span-2 bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 flex flex-col">
-                {selectedChat ? (
-                  <>
-                    {/* Chat Header */}
-                    <div className="p-4 border-b border-white/20 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => setSelectedChat(null)}
-                          className="lg:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"
-                        >
-                          <ArrowLeft className="w-5 h-5" />
-                        </button>
-                        <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                          {selectedChat.isGroup ? (
-                            <Users className="w-5 h-5 text-white" />
-                          ) : (
-                            <span className="text-white font-semibold">
-                              {selectedChat.name.charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="text-white font-medium">{selectedChat.name}</h3>
-                          <p className="text-white/50 text-sm">
-                            {selectedChat.isGroup ? 'Group' : 'Contact'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
-                          <Phone className="w-5 h-5" />
-                        </button>
-                        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
-                          <Video className="w-5 h-5" />
-                        </button>
-                        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
-                          <MoreVertical className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                      {messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                              message.fromMe
-                                ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                                : 'bg-white/20 text-white'
-                            }`}
-                          >
-                            <p className="text-sm">{message.body}</p>
-                            <div className="flex items-center justify-end space-x-1 mt-1">
-                              <span className="text-xs opacity-70">
-                                {formatTime(message.timestamp)}
-                              </span>
-                              {message.fromMe && (
-                                <CheckCheck className="w-3 h-3 opacity-70" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Message Input */}
-                    <div className="p-4 border-t border-white/20">
-                      <div className="flex items-center space-x-2">
-                        <button className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg">
-                          <Paperclip className="w-5 h-5" />
-                        </button>
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            placeholder="Type a message..."
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                            className="w-full bg-white/10 border border-white/20 rounded-full px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          />
-                          <button className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-white/70 hover:text-white">
-                            <Smile className="w-5 h-5" />
-                          </button>
-                        </div>
-                        <button
-                          onClick={sendMessage}
-                          disabled={!newMessage.trim()}
-                          className="p-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Send className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <MessageSquare className="w-16 h-16 text-white/30 mx-auto mb-4" />
-                      <p className="text-white/50">Select a chat to start messaging</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Statistics Tab */}
-          {activeTab === 'stats' && (
-            <div className="space-y-6">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white/70 text-sm">Uptime</p>
-                      <p className="text-2xl font-bold text-white">{formatUptime(stats.uptime)}</p>
-                    </div>
-                    <Activity className="w-8 h-8 text-green-400" />
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white/70 text-sm">Total Users</p>
-                      <p className="text-2xl font-bold text-white">{stats.totalUsers}</p>
-                    </div>
-                    <Users className="w-8 h-8 text-blue-400" />
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white/70 text-sm">Messages</p>
-                      <p className="text-2xl font-bold text-white">{stats.messageCount}</p>
-                    </div>
-                    <MessageSquare className="w-8 h-8 text-purple-400" />
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white/70 text-sm">Commands</p>
-                      <p className="text-2xl font-bold text-white">{stats.totalCommands}</p>
-                    </div>
-                    <Bot className="w-8 h-8 text-orange-400" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Performance Metrics */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">System Performance</h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-white/70">CPU Usage</span>
-                        <span className="text-white">{stats.cpuUsage}%</span>
-                      </div>
-                      <div className="w-full bg-white/20 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full"
-                          style={{ width: `${stats.cpuUsage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-white/70">RAM Usage</span>
-                        <span className="text-white">{stats.ramUsage}%</span>
-                      </div>
-                      <div className="w-full bg-white/20 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full"
-                          style={{ width: `${stats.ramUsage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Bot Activity</h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Active Users</span>
-                      <span className="text-white font-medium">{stats.activeUsers}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Total Groups</span>
-                      <span className="text-white font-medium">{stats.totalGroups}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Banned Users</span>
-                      <span className="text-white font-medium">{stats.bannedUsers}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Settings Tab */}
-          {activeTab === 'settings' && (
-            <div className="space-y-6">
-              {/* Basic Settings */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Basic Settings</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Bot Name</label>
-                    <input
-                      type="text"
-                      value={settings.botName}
-                      onChange={(e) => updateSettings({ botName: e.target.value })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Command Prefix</label>
-                    <input
-                      type="text"
-                      value={settings.prefix}
-                      onChange={(e) => updateSettings({ prefix: e.target.value })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Language</label>
-                    <select
-                      value={settings.language}
-                      onChange={(e) => updateSettings({ language: e.target.value })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="EN">English</option>
-                      <option value="SI">Sinhala</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Owner Number</label>
-                    <input
-                      type="text"
-                      value={settings.ownerNumber}
-                      onChange={(e) => updateSettings({ ownerNumber: e.target.value })}
-                      placeholder="+1234567890"
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Work Mode</label>
-                    <select
-                      value={settings.workMode}
-                      onChange={(e) => updateSettings({ workMode: e.target.value })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="public">Public</option>
-                      <option value="private">Private Only</option>
-                      <option value="group-only">Groups Only</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Response Delay (ms)</label>
-                    <input
-                      type="number"
-                      value={settings.responseDelay}
-                      onChange={(e) => updateSettings({ responseDelay: parseInt(e.target.value) })}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Behavior Settings */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Behavior Settings</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[
-                    { key: 'autoReact', label: 'Auto React', description: 'Automatically react to messages' },
-                    { key: 'autoRead', label: 'Auto Read', description: 'Mark messages as read automatically' },
-                    { key: 'autoTyping', label: 'Auto Typing', description: 'Show typing indicator' },
-                    { key: 'welcomeMessage', label: 'Welcome Message', description: 'Send welcome message to new users' },
-                    { key: 'antiLink', label: 'Anti Link', description: 'Block messages with links' },
-                    { key: 'antiSpam', label: 'Anti Spam', description: 'Prevent spam messages' },
-                    { key: 'antiFlood', label: 'Anti Flood', description: 'Prevent message flooding' },
-                    { key: 'logMessages', label: 'Log Messages', description: 'Log all messages' },
-                    { key: 'saveMedia', label: 'Save Media', description: 'Save downloaded media' }
-                  ].map((setting) => (
-                    <div key={setting.key} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                      <div>
-                        <h4 className="text-white font-medium">{setting.label}</h4>
-                        <p className="text-white/60 text-sm">{setting.description}</p>
-                      </div>
-                      <button
-                        onClick={() => updateSettings({ [setting.key]: !settings[setting.key as keyof BotSettings] })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings[setting.key as keyof BotSettings] ? 'bg-purple-500' : 'bg-white/20'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings[setting.key as keyof BotSettings] ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Advanced Features */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Advanced Features</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[
-                    { key: 'aiChatbot', label: 'AI Chatbot', description: 'Enable AI-powered responses' },
-                    { key: 'voiceToText', label: 'Voice to Text', description: 'Convert voice messages to text' },
-                    { key: 'textToVoice', label: 'Text to Voice', description: 'Convert text to voice messages' },
-                    { key: 'imageGeneration', label: 'Image Generation', description: 'Generate images from text' },
-                    { key: 'weatherUpdates', label: 'Weather Updates', description: 'Provide weather information' },
-                    { key: 'newsUpdates', label: 'News Updates', description: 'Send news updates' },
-                    { key: 'reminderSystem', label: 'Reminder System', description: 'Set and manage reminders' },
-                    { key: 'groupManagement', label: 'Group Management', description: 'Advanced group controls' },
-                    { key: 'autoDownloadMedia', label: 'Auto Download Media', description: 'Automatically download media' }
-                  ].map((setting) => (
-                    <div key={setting.key} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                      <div>
-                        <h4 className="text-white font-medium">{setting.label}</h4>
-                        <p className="text-white/60 text-sm">{setting.description}</p>
-                      </div>
-                      <button
-                        onClick={() => updateSettings({ [setting.key]: !settings[setting.key as keyof BotSettings] })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings[setting.key as keyof BotSettings] ? 'bg-purple-500' : 'bg-white/20'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings[setting.key as keyof BotSettings] ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Security Settings */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Security Settings</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    {[
-                      { key: 'adminOnly', label: 'Admin Only Mode', description: 'Only admins can use the bot' },
-                      { key: 'groupAdminOnly', label: 'Group Admin Only', description: 'Only group admins can use admin commands' },
-                      { key: 'blockUnknown', label: 'Block Unknown', description: 'Block messages from unknown contacts' }
-                    ].map((setting) => (
-                      <div key={setting.key} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                        <div>
-                          <h4 className="text-white font-medium">{setting.label}</h4>
-                          <p className="text-white/60 text-sm">{setting.description}</p>
-                        </div>
-                        <button
-                          onClick={() => updateSettings({ [setting.key]: !settings[setting.key as keyof BotSettings] })}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings[setting.key as keyof BotSettings] ? 'bg-purple-500' : 'bg-white/20'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings[setting.key as keyof BotSettings] ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-white/80 text-sm font-medium mb-2">Max Messages Per Minute</label>
-                      <input
-                        type="number"
-                        value={settings.maxMessagesPerMinute}
-                        onChange={(e) => updateSettings({ maxMessagesPerMinute: parseInt(e.target.value) })}
-                        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-white/80 text-sm font-medium mb-2">Max Download Size</label>
-                      <select
-                        value={settings.maxDownloadSize}
-                        onChange={(e) => updateSettings({ maxDownloadSize: e.target.value })}
-                        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      >
-                        <option value="50MB">50MB</option>
-                        <option value="100MB">100MB</option>
-                        <option value="200MB">200MB</option>
-                        <option value="500MB">500MB</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Auto Reply Settings */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Auto Reply Settings</h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-white font-medium">Enable Auto Reply</h4>
-                      <p className="text-white/60 text-sm">Automatically reply to private messages</p>
-                    </div>
-                    <button
-                      onClick={() => updateSettings({ autoReplyEnabled: !settings.autoReplyEnabled })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        settings.autoReplyEnabled ? 'bg-purple-500' : 'bg-white/20'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          settings.autoReplyEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Auto Reply Message</label>
-                    <textarea
-                      value={settings.autoReplyText}
-                      onChange={(e) => updateSettings({ autoReplyText: e.target.value })}
-                      rows={3}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Welcome Message</label>
-                    <textarea
-                      value={settings.welcomeText}
-                      onChange={(e) => updateSettings({ welcomeText: e.target.value })}
-                      rows={3}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Developer Tab */}
-          {activeTab === 'developer' && (
-            <div className="space-y-6">
-              {/* Developer Profile */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 p-8">
-                <div className="text-center mb-8">
-                  <div className="w-24 h-24 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <User className="w-12 h-12 text-white" />
-                  </div>
-                  <h2 className="text-3xl font-bold text-white mb-2">DarkWinzo</h2>
-                  <p className="text-white/70 text-lg">Full Stack Developer & Bot Creator</p>
-                  <div className="flex items-center justify-center space-x-2 mt-2">
-                    <MapPin className="w-4 h-4 text-white/50" />
-                    <span className="text-white/50">Sri Lanka</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className="text-center p-4 bg-white/5 rounded-lg">
-                    <Code className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                    <h3 className="text-white font-semibold">5+ Years</h3>
-                    <p className="text-white/60 text-sm">Experience</p>
-                  </div>
-                  <div className="text-center p-4 bg-white/5 rounded-lg">
-                    <Star className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                    <h3 className="text-white font-semibold">50+ Projects</h3>
-                    <p className="text-white/60 text-sm">Completed</p>
-                  </div>
-                  <div className="text-center p-4 bg-white/5 rounded-lg">
-                    <Heart className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                    <h3 className="text-white font-semibold">1000+ Users</h3>
-                    <p className="text-white/60 text-sm">Happy Clients</p>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-white/80 text-lg mb-6">
-                    Passionate developer specializing in WhatsApp automation, web development, and creating innovative solutions. 
-                    Always excited to work on new projects and help bring ideas to life.
-                  </p>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                    <MessageCircle className="w-5 h-5 mr-2" />
-                    Get In Touch
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <a 
-                      href="mailto:isurulakshan9998@gmail.com"
-                      className="flex items-center space-x-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group"
-                    >
-                      <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                        <Mail className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-white font-medium">Email</h4>
-                        <p className="text-white/60 text-sm">isurulakshan9998@gmail.com</p>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-white/40 group-hover:text-white/60" />
-                    </a>
-
-                    <a 
-                      href="https://github.com/DarkWinzo"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center space-x-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group"
-                    >
-                      <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                        <Github className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-white font-medium">GitHub</h4>
-                        <p className="text-white/60 text-sm">github.com/DarkWinzo</p>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-white/40 group-hover:text-white/60" />
-                    </a>
-
-                    <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-lg">
-                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <Globe className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-white font-medium">Location</h4>
-                        <p className="text-white/60 text-sm">Sri Lanka, Asia</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                    <Briefcase className="w-5 h-5 mr-2" />
-                    Services
-                  </h3>
-                  
-                  <div className="space-y-3">
-                    {[
-                      { icon: Bot, title: 'WhatsApp Bot Development', desc: 'Custom bot solutions' },
-                      { icon: Globe, title: 'Web Development', desc: 'Full-stack applications' },
-                      { icon: Smartphone, title: 'Mobile Apps', desc: 'Cross-platform development' },
-                      { icon: Shield, title: 'Security Solutions', desc: 'Secure implementations' },
-                      { icon: Zap, title: 'API Integration', desc: 'Third-party services' },
-                      { icon: Award, title: 'Consulting', desc: 'Technical guidance' }
-                    ].map((service, index) => (
-                      <div key={index} className="flex items-center space-x-3 p-3 bg-white/5 rounded-lg">
-                        <service.icon className="w-6 h-6 text-purple-400" />
-                        <div>
-                          <h4 className="text-white font-medium text-sm">{service.title}</h4>
-                          <p className="text-white/60 text-xs">{service.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Skills & Technologies */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Skills & Technologies</h3>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {[
-                    'JavaScript', 'TypeScript', 'Node.js', 'React', 'Python', 'PHP',
-                    'MongoDB', 'MySQL', 'PostgreSQL', 'Redis', 'Docker', 'AWS',
-                    'WhatsApp API', 'Telegram Bot', 'Discord Bot', 'REST API',
-                    'GraphQL', 'Socket.IO', 'Express.js', 'Next.js', 'Vue.js', 'Angular'
-                  ].map((skill) => (
-                    <div key={skill} className="bg-white/5 rounded-lg p-3 text-center">
-                      <span className="text-white text-sm font-medium">{skill}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Project Stats */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Project Statistics</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Code className="w-8 h-8 text-white" />
-                    </div>
-                    <h4 className="text-2xl font-bold text-white">50+</h4>
-                    <p className="text-white/60">Projects Completed</p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Users className="w-8 h-8 text-white" />
-                    </div>
-                    <h4 className="text-2xl font-bold text-white">1000+</h4>
-                    <p className="text-white/60">Happy Clients</p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Star className="w-8 h-8 text-white" />
-                    </div>
-                    <h4 className="text-2xl font-bold text-white">4.9/5</h4>
-                    <p className="text-white/60">Average Rating</p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Calendar className="w-8 h-8 text-white" />
-                    </div>
-                    <h4 className="text-2xl font-bold text-white">5+</h4>
-                    <p className="text-white/60">Years Experience</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Form */}
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Send a Message</h3>
-                
-                <form className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-white/80 text-sm font-medium mb-2">Name</label>
-                      <input
-                        type="text"
-                        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="Your name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-white/80 text-sm font-medium mb-2">Email</label>
-                      <input
-                        type="email"
-                        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="your@email.com"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Subject</label>
-                    <input
-                      type="text"
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="Project inquiry"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white/80 text-sm font-medium mb-2">Message</label>
-                    <textarea
-                      rows={4}
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="Tell me about your project..."
-                    />
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold py-3 px-4 rounded-lg hover:from-purple-600 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
-                  >
-                    Send Message
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
+        <div className="min-h-[600px]">
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'settings' && renderSettings()}
+          {activeTab === 'chats' && renderChats()}
+          {activeTab === 'developer' && renderDeveloper()}
         </div>
       </div>
     </div>

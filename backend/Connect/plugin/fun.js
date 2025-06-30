@@ -1,4 +1,4 @@
-const { Queen } = require("../lib");
+const { Queen } = require("../lib/event");
 
 Queen.addCommand({
   pattern: ["joke"],
@@ -68,6 +68,26 @@ Queen.addCommand({
   
   const randomFact = facts[Math.floor(Math.random() * facts.length)];
   await client.sendMessage(message.key.remoteJid, { text: `🤯 *Random Fact*\n\n${randomFact}` });
+});
+
+Queen.addCommand({
+  pattern: ["meme"],
+  category: "fun",
+  onlyPm: false,
+  onlyGroup: false,
+  React: "🤣",
+  desc: "Get a random meme",
+  usage: ".meme"
+}, async (message, client) => {
+  const memes = [
+    "🤣 *Programming Meme:*\n99 little bugs in the code,\n99 little bugs,\nTake one down, patch it around,\n117 little bugs in the code! 🐛",
+    "😂 *Life Meme:*\nMe: I'll go to bed early tonight\nAlso me at 3 AM: Just one more video... 📱",
+    "🤪 *Coffee Meme:*\nCoffee: Because adulting is hard ☕\nMe: *drinks 5th cup* Still hard! 😵",
+    "😅 *Monday Meme:*\nMonday: Exists\nMe: And I took that personally 😤"
+  ];
+  
+  const randomMeme = memes[Math.floor(Math.random() * memes.length)];
+  await client.sendMessage(message.key.remoteJid, { text: randomMeme });
 });
 
 module.exports = {};

@@ -1,4 +1,4 @@
-const { Queen } = require("../lib");
+const { Queen } = require("../lib/event");
 
 // Auto-reply for greeting without prefix
 Queen.addCommand({

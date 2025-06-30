@@ -1,4 +1,4 @@
-const { Queen } = require("../lib");
+const { Queen } = require("../lib/event");
 
 Queen.addCommand({
   pattern: ["kick"],
