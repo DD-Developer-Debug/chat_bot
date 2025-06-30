@@ -1,0 +1,11 @@
+{
+  "LANGUAGE": "EN",
+  "PREFIX": ".",
+  "OWNER_NUMBER": "",
+  "BOT_NAME": "Queen Bot",
+  "AUTO_REACT": true,
+  "AUTO_READ": false,
+  "WELCOME_MESSAGE": true,
+  "ANTI_LINK": false,
+  "MAX_DOWNLOAD_SIZE": "100MB"
+}
